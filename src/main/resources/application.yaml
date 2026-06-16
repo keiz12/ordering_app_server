@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: orderingapp
+
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/ordering_app
+    username: root
+    password: JKJK
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+
+  # Server port
+server:
+  port: 8081
+
+logging:
+  level:
+    org:
+      springframework:
+        security: DEBUG
+    root: INFO

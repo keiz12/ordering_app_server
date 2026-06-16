@@ -1,0 +1,158 @@
+package com.example.orderingapp.order;
+
+import com.example.orderingapp.dto.order.CreateOrderRequest;
+import com.example.orderingapp.dto.order.OrderFail;
+import com.example.orderingapp.dto.order.OrderResponseDTO;
+import com.example.orderingapp.dto.order.OrderedProducts;
+import com.example.orderingapp.product.ProductRepository;
+import com.example.orderingapp.staff_order_fail.StaffFailedOrderRepository;
+import com.example.orderingapp.staff_order_process.StaffProcessedOrderRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+@Service@RequiredArgsConstructor
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+
+    private final StaffProcessedOrderRepository staffProcessedOrderRepository;
+
+    private final StaffFailedOrderRepository staffFailedOrderRepository;
+
+    private final ProductRepository productRepository;
+
+    public ResponseEntity<?> createOrder (CreateOrderRequest createOrderRequest) {
+
+
+        createOrderRequest
+                .getOrderedProducts()
+                .forEach(e -> e.getProductDTO().setId(productRepository.findProductIdByName(e.getProductDTO().getName())));
+
+        orderRepository.createOrder(createOrderRequest);
+
+        return ResponseEntity.ok("Order created successfully");
+    }
+
+    @Transactional
+    public ResponseEntity<?> updateOrder(CreateOrderRequest request) {
+
+        Long orderId = orderRepository.findOrderIDByUUID(request.getUuid());
+
+        if (orderId == null) {
+            throw new RuntimeException(
+                    "Order not found for UUID: " + request.getUuid());
+        }
+
+        if (orderRepository.isOrderPaid(orderId)) {
+            return ResponseEntity.badRequest().body("Paid orders cannot be modified");
+        }
+
+        CreateOrderRequest currentOrder =
+                orderRepository.getOrderRequestById(orderId);
+
+        setProductID (request);
+
+        boolean updated = false;
+
+        if (hasOrderTableChanged(currentOrder.getTableNumber(), request.getTableNumber()))
+        {
+            orderRepository.updateOrderTableNumber(orderId, request);
+            updated = true;
+        }
+
+        if (hasOrderProductChanged(currentOrder.getOrderedProducts(), request.getOrderedProducts()))
+        {
+            orderRepository.updateOrderProduct(orderId, request.getOrderedProducts());
+            updated = true;
+        }
+
+        if (updated)
+            return ResponseEntity.accepted().body("Order Updated Successfully");
+        else
+            return ResponseEntity.badRequest().body("You have nothing to updated");
+    }
+
+    private void setProductID (CreateOrderRequest request)
+    {
+        request
+                .getOrderedProducts()
+                .forEach(e -> e.getProductDTO().setId(productRepository.findProductIdByName(e.getProductDTO().getName())));
+    }
+
+    public CreateOrderRequest getCreateOrderRequestByUUD (String uuid) {
+        Long orderId = orderRepository.findOrderIDByUUID(uuid);
+        return orderRepository.getOrderRequestById(orderId);
+    }
+
+    private boolean hasOrderTableChanged
+            (int currTableNumber, int newTableNumber)
+    {
+        return currTableNumber != newTableNumber;
+    }
+
+    private boolean hasOrderProductChanged(
+            List<OrderedProducts> currentProducts,
+            List<OrderedProducts> incomingProducts) {
+
+        if (currentProducts.size() != incomingProducts.size())
+            return true;
+
+
+        Map<Long, Integer> currentMap = currentProducts.stream()
+                .collect(Collectors.toMap(
+                        op -> op.getProductDTO().getId(),
+                        OrderedProducts::getProductQuantity
+                ));
+
+        Map<Long, Integer> incomingMap = incomingProducts.stream()
+                .collect(Collectors.toMap(
+                        op -> productRepository.findProductIdByName(op.getProductDTO().getName()),
+                        OrderedProducts::getProductQuantity
+                ));
+
+        return !currentMap.equals(incomingMap);
+    }
+
+    @Transactional
+    public ResponseEntity<?> deleteOrder(OrderFail orderFail) {
+
+        Long orderId = orderRepository.findOrderIDByUUID(orderFail.getOrderUUID());
+
+        if (orderRepository.isOrderPaid(orderId)) {
+            return ResponseEntity.badRequest().body("Order can't be deleted as it is already paid");
+        }
+
+        Long staffId = staffProcessedOrderRepository.findAssignedStaff(orderId);
+
+        if (staffProcessedOrderRepository.delete(orderId))
+            staffFailedOrderRepository.insert(staffId, orderId, orderFail.getCause().toString());
+        else
+            orderRepository.deleteOrder(orderId);
+
+        return ResponseEntity.ok().body("Order deleted successfully");
+    }
+
+    @Transactional
+    public ResponseEntity<?> deleteOrder(String uuid) {
+
+        Long orderId = orderRepository.findOrderIDByUUID(uuid);
+
+        orderRepository.deleteOrder(orderId);
+
+        return ResponseEntity.ok().body("Order deleted successfully");
+    }
+
+
+//    public List<OrderResponseDTO> getOrdersByDate(LocalDate date) {
+//        return orderRepository.findOrdersByDate(date);
+//    }
+}
