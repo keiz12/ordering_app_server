@@ -1,0 +1,1 @@
+INSERT INTO android_key (android_key, created_by) VALUES ("$2a$10$YOKowc9yh1hJOljQnararuxTZuf018maRy8TU351fr1ljllVYEDeC", 17);
