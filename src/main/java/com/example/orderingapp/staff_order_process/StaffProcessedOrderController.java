@@ -1,6 +1,7 @@
 package com.example.orderingapp.staff_order_process;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,36 +11,47 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/staff-orders")
 @RequiredArgsConstructor
 public class StaffProcessedOrderController {
 
     private final StaffProcessedOrderService service;
 
-    @PostMapping("/{orderUuid}")
-    public ResponseEntity<Void> processOrder(
-            @PathVariable String orderUuid) {
+    @PostMapping("/staff-orders/process/{orderUuid}")
+    public ResponseEntity<?> processOrder (@PathVariable String orderUuid) {
 
         service.processOrder(orderUuid);
         return ResponseEntity.ok().build();
     }
 
-//    @DeleteMapping("/{orderUuid}")
-//    public ResponseEntity<Void> unprocessOrder(
-//            @PathVariable String orderUuid) {
+//    @DeleteMapping("/staff-orders/unprocess/{orderUuid}")
+//    public ResponseEntity<Void> unprocessOrder (@PathVariable String orderUuid) {
 //
 //        service.unprocessOrder(orderUuid);
 //        return ResponseEntity.ok().build();
 //    }
 
-    @GetMapping("/by-date")
-    public ResponseEntity<?> getProcessedOrdersByDate(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(service.getProcessedOrdersByDate(date));
+    @GetMapping("/secure/order/{uuid}")
+    public ResponseEntity<?> getStaffProcessedOrder (@PathVariable String uuid) {
+        return service.findStaffProcessedOrder(uuid);
     }
 
-    @PatchMapping ("/order-payment/{uuid}")
+    @GetMapping("/secure/order/by-date/{date}")
+    public ResponseEntity<?> getProcessedOrdersByDate(@PathVariable String date) {
+        return service.getProcessedOrdersByDate(date);
+    }
+
+    @GetMapping("/secure/all/order/date")
+    public ResponseEntity<?> getAllOrderCreatedAtDates() {
+        return service.getAllOrderCreatedAtDates();
+    }
+
+    @PatchMapping ("/staff-orders/pay/confirm/{uuid}")
     public ResponseEntity<?> orderPaymentConfirm (@PathVariable String uuid) {
         return service.orderPaymentConfirm(uuid);
+    }
+
+    @PatchMapping ("/staff-orders/pay/rollback/{uuid}")
+    public ResponseEntity<?> orderPaymentRollback (@PathVariable String uuid) {
+        return service.orderPaymentRollback(uuid);
     }
 }

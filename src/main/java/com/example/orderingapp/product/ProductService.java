@@ -5,8 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -32,10 +31,12 @@ public class ProductService {
 
 
     @Transactional
-    public void update(ProductDTO oldProduct,
+    public void update(String oldProductName,
                        ProductDTO newProduct) {
 
-        Long id = repository.findProductIdByName(oldProduct.getName());
+        Long id = repository.findProductIdByName(oldProductName);
+
+        ProductDTO oldProduct = repository.findById(id);
 
         if (!Objects.equals(
                 oldProduct.getName(),
@@ -59,25 +60,29 @@ public class ProductService {
 
         if (!Objects.equals(
                 oldProduct.getPrice(),
-                newProduct.getPrice())) {
+                newProduct.getPrice()))
+        {
 
             repository.updatePrice(
                     id,
                     newProduct.getPrice()
             );
         }
+
+        updateImages(id, newProduct.getImagePathToDeletePath(), newProduct.getImageURLPath());
     }
 
-    public void deleteProductImage (String productName, String productImagePath) {
-        repository.deleteImage(repository.findProductIdByName(productName), productImagePath);
-    }
-
-    public void insertProductImages (String productName, List<String> productImagePaths) {
-        repository.insertImages(repository.findProductIdByName(productName), productImagePaths);
+    private void updateImages
+            (Long productID, HashMap<String, String> newImagePathToDeletePath, List<String> toDeleteImagesPath)
+    {
+        repository.deleteImage(productID, toDeleteImagesPath);
+        repository.insertImages(productID, newImagePathToDeletePath);
     }
 
     public void delete(String productName) {
         Long id = repository.findProductIdByName(productName);
+        ProductDTO productDTO = repository.findById(id);
+        repository.deleteImage(id, productDTO.getImageURLPath());
         repository.delete(id);
     }
 }

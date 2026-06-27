@@ -6,17 +6,20 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/ordering_app
     username: root
-    password: JKJK
+    password: MySQL0781172951
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 
   # Server port
 server:
-  port: 8081
+  port: 9090
 
 logging:
   level:
     org:
       springframework:
         security: DEBUG
+        web: DEBUG
+      apache:
+        tomcat: DEBUG
     root: INFO

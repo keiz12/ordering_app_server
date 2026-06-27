@@ -33,8 +33,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/all/**").permitAll()
                     .requestMatchers("/secure/boss/**").hasRole("BOSS")
-                    .requestMatchers("/secure/product").hasAnyRole("BOSS", "MANAGER")
-                    .requestMatchers(HttpMethod.POST,"/staff-orders/**").hasRole("STAFF")
+                    .requestMatchers("/secure/product", "/secure/statistics", "/secure/statistic/total").hasAnyRole("BOSS", "MANAGER")
+                    .requestMatchers("/staff-orders/**").hasRole("STAFF")
                     .anyRequest().authenticated()
             )
             .anonymous(AbstractHttpConfigurer::disable)

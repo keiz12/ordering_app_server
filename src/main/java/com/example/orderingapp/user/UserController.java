@@ -47,6 +47,12 @@ public class UserController {
         return ResponseEntity.ok("User updated successfully");
     }
 
+    @PostMapping("/secure/user/login")
+    public ResponseEntity<?> getUser (@RequestBody UserDTO user)
+    {
+        return userService.getUser(user);
+    }
+
     @DeleteMapping("/secure/boss/user")
     public ResponseEntity<String> deleteUser() {
         userService.deleteUser();

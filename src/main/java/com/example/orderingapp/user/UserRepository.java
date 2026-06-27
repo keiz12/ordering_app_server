@@ -135,7 +135,7 @@ public class UserRepository {
         }, username).stream().findFirst();
     }
 
-    public Optional<UserDTO> findByUserID(Long user_id, boolean...noPassword) {
+    public UserDTO findByUserID(Long user_id, boolean...noPassword) {
         String sql = """
                 SELECT u.id, u.username, u.password, ar.role
                 FROM user u
@@ -143,7 +143,8 @@ public class UserRepository {
                 WHERE u.id = ?
                 """;
 
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+        var l = jdbcTemplate.query(sql, (rs, rowNum) ->
+        {
             UserDTO user = new UserDTO();
             user.setId(rs.getLong("id"));
             user.setUsername(rs.getString("username"));
@@ -153,14 +154,16 @@ public class UserRepository {
 
             user.setRole(rs.getString("role"));
             return user;
-        }, user_id).stream().findFirst();
+        }, user_id);
+
+        return l.isEmpty() ? null : l.getFirst();
     }
 
     public List<UserDTO> getAllUsers ()
     {
         String sql =
                 """
-                        select user.id, user.username, authorization_roles.user_id, user.password from user
+                        select user.id, user.username, authorization_roles.role, user.password from user
                         JOIN authorization_roles ON authorization_roles.user_ID = user.ID;
                 """;
 

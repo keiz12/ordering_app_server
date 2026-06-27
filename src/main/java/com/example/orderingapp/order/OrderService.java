@@ -1,45 +1,47 @@
 package com.example.orderingapp.order;
 
-import com.example.orderingapp.dto.order.CreateOrderRequest;
-import com.example.orderingapp.dto.order.OrderFail;
-import com.example.orderingapp.dto.order.OrderResponseDTO;
-import com.example.orderingapp.dto.order.OrderedProducts;
+import com.example.orderingapp.dto.order.*;
 import com.example.orderingapp.product.ProductRepository;
-import com.example.orderingapp.staff_order_fail.StaffFailedOrderRepository;
 import com.example.orderingapp.staff_order_process.StaffProcessedOrderRepository;
+import com.example.orderingapp.webSocket.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Service@RequiredArgsConstructor
+@Service
+@RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepository;
 
     private final StaffProcessedOrderRepository staffProcessedOrderRepository;
-
-    private final StaffFailedOrderRepository staffFailedOrderRepository;
+//
+//    private final StaffFailedOrderRepository staffFailedOrderRepository;
 
     private final ProductRepository productRepository;
 
-    public ResponseEntity<?> createOrder (CreateOrderRequest createOrderRequest) {
+    private final WebSocketNotificationService notificationService;
 
+    public ResponseEntity<?> createOrder (Order request) {
 
-        createOrderRequest
-                .getOrderedProducts()
-                .forEach(e -> e.getProductDTO().setId(productRepository.findProductIdByName(e.getProductDTO().getName())));
+        orderRepository.createOrder(request, productRepository);
 
-        orderRepository.createOrder(createOrderRequest);
+        notificationService.clientMadeOrderOnEmployeeActivity(request);
 
         return ResponseEntity.ok("Order created successfully");
+    }
+
+    public ResponseEntity<?> isOrderPaid (String orderUuid) {
+        return ResponseEntity.ok(orderRepository.isOrderPaid(orderUuid));
+    }
+
+    public ResponseEntity<?> getOrder (String uuid) {
+        return ResponseEntity.ok(orderRepository.findOrderByUUID(uuid, productRepository));
     }
 
     @Transactional
@@ -122,35 +124,40 @@ public class OrderService {
         return !currentMap.equals(incomingMap);
     }
 
-    @Transactional
-    public ResponseEntity<?> deleteOrder(OrderFail orderFail) {
+//    @Transactional
+//    public ResponseEntity<?> deleteOrder(OrderFail orderFail) {
+//
+//        Long orderId = orderRepository.findOrderIDByUUID(orderFail.getOrderUUID());
+//
+//        if (orderRepository.isOrderPaid(orderId))
+//            return ResponseEntity.badRequest().body("Order can't be deleted as it is already paid");
 
-        Long orderId = orderRepository.findOrderIDByUUID(orderFail.getOrderUUID());
 
-        if (orderRepository.isOrderPaid(orderId)) {
-            return ResponseEntity.badRequest().body("Order can't be deleted as it is already paid");
-        }
+//        Long staffId = staffProcessedOrderRepository.findAssignedStaff(orderId);
 
-        Long staffId = staffProcessedOrderRepository.findAssignedStaff(orderId);
+//        if (staffProcessedOrderRepository.delete(orderId))
+//            staffFailedOrderRepository.insert(staffId, orderId, orderFail.getCause().toString());
+//        else
 
-        if (staffProcessedOrderRepository.delete(orderId))
-            staffFailedOrderRepository.insert(staffId, orderId, orderFail.getCause().toString());
-        else
-            orderRepository.deleteOrder(orderId);
-
-        return ResponseEntity.ok().body("Order deleted successfully");
-    }
+//        orderRepository.deleteOrder(orderId);
+//
+//        return ResponseEntity.ok().body("Order deleted successfully");
+//    }
 
     @Transactional
     public ResponseEntity<?> deleteOrder(String uuid) {
 
         Long orderId = orderRepository.findOrderIDByUUID(uuid);
 
+        if (orderRepository.isOrderPaid(orderId))
+            return ResponseEntity.badRequest().body("The order can't be deleted as it's already paid.");
+
         orderRepository.deleteOrder(orderId);
+
+        notificationService.clientDeleteOrderOnEmployeeActivity(uuid);
 
         return ResponseEntity.ok().body("Order deleted successfully");
     }
-
 
 //    public List<OrderResponseDTO> getOrdersByDate(LocalDate date) {
 //        return orderRepository.findOrdersByDate(date);

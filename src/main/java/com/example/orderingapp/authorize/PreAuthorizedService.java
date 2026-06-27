@@ -13,9 +13,9 @@ public class PreAuthorizedService {
 
     public boolean isValidApiKey(String apiKey) {
 
-        if (apiKey == null || apiKey.isBlank()) {
+        if (apiKey == null || apiKey.isBlank())
             return false;
-        }
+
 
         return androidKeyService.isKeyValid(apiKey);
     }

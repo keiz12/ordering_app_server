@@ -71,8 +71,12 @@ public class AndroidKeyService {
         return count != null && count > 0;
     }
 
-    public String getAndroidKey() {
-        String sql = "SELECT android_key FROM android_key LIMIT 1";
-        return jdbcTemplate.queryForObject(sql, String.class);
+    public int getAndroidKeyCount() {
+
+        String sql = "SELECT COUNT(android_key) FROM android_key WHERE created_by=?";
+
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return jdbcTemplate.queryForObject(sql, (rs,rn) -> rs.getInt(1), userRepository.getUserIdByUsername(user.getUsername()));
     }
 }

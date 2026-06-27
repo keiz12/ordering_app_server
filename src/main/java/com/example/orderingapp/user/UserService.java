@@ -2,13 +2,14 @@ package com.example.orderingapp.user;
 
 import com.example.orderingapp.dto.user.UserDTO;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.*;
+import org.springframework.http.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +38,17 @@ public class UserService {
     }
 
     public UserDTO getUser (Long id) {
-        return userRepository.findByUserID(id).orElseThrow();
+        return Optional.ofNullable(userRepository.findByUserID(id)).orElseThrow();
+    }
+
+    public ResponseEntity<?> getUser (UserDTO userDTO) {
+
+        UserDTO userDTO1 = userRepository.findByUsername(userDTO.getUsername()).orElseThrow();
+
+        if (!encoder.matches(userDTO.getPassword(), userDTO1.getPassword()))
+            return null;
+        else
+            return ResponseEntity.ok(userDTO1);
     }
 
     public List<UserDTO> getAllUsers () {

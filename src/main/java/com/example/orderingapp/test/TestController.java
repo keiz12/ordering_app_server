@@ -1,9 +1,9 @@
 package com.example.orderingapp.test;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
+@CrossOrigin(origins = "*")
 public class TestController {
 
     @GetMapping("/all/get/test")

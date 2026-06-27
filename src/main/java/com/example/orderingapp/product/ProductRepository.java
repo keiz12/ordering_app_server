@@ -6,7 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -23,29 +23,26 @@ public class ProductRepository {
 
         Long productId = findProductIdByName(product.getName());
 
-        insertImages(productId, product.getImagePaths());
+        insertImages(productId, product.getImagePathToDeletePath());
 
         return productId;
     }
 
-    public void insertImages(Long productId, List<String> images) {
+    public void insertImages(Long productId,  HashMap<String, String> images) {
 
         if (images == null || images.isEmpty()) {
             return;
         }
 
-        String sql =
-                "INSERT INTO product_image(product_id,image_path) VALUES(?,?)";
+        // image_delete_path
 
-        jdbcTemplate.batchUpdate(
-                sql,
-                images,
-                images.size(),
-                (ps, image) -> {
-                    ps.setLong(1, productId);
-                    ps.setString(2, image);
-                }
-        );
+        // image_path
+
+        String sql =
+                "INSERT INTO product_image(product_id,image_path, image_delete_path) VALUES(?,?,?)";
+
+        for (Map.Entry<String, String> set : images.entrySet())
+            jdbcTemplate.update(sql, productId, set.getKey(), set.getValue());
     }
 
     public ProductDTO findById (Long id) {
@@ -53,8 +50,8 @@ public class ProductRepository {
         String sql =
                 "SELECT * FROM product WHERE id=?";
 
-        ProductDTO product =
-                jdbcTemplate.queryForObject(
+        List<ProductDTO> products =
+                jdbcTemplate.query(
                         sql,
                         (rs, rowNum) -> {
                             ProductDTO dto = new ProductDTO();
@@ -67,9 +64,21 @@ public class ProductRepository {
                         id
                 );
 
-        product.setImagePaths(findImagesByProductId(id));
+        if (!products.isEmpty())
+            products.getFirst().setImageURLPath(findImagesByProductId(id));
 
-        return product;
+        return products.isEmpty() ? null : products.getFirst();
+    }
+
+    public String findProductNameByID (long id) {
+
+        String sql = "SELECT name FROM product WHERE id=?";
+
+        RowMapper<String> mapper = (rs, rn) -> rs.getString(1);
+
+        var l = jdbcTemplate.query(sql,mapper,id);
+
+        return l.isEmpty() ? null : l.getFirst();
     }
 
 
@@ -117,7 +126,7 @@ public class ProductRepository {
                         });
 
         products.forEach(p ->
-                p.setImagePaths(findImagesByProductId(p.getId()))
+                p.setImageURLPath(findImagesByProductId(p.getId()))
         );
 
         return products;
@@ -150,13 +159,16 @@ public class ProductRepository {
         );
     }
 
-    public void deleteImage(Long productId, String imagePath) {
+    public void deleteImage(Long productId, List<String> toDeleteImagesPath) {
 
-        jdbcTemplate.update(
-                "DELETE FROM product_image WHERE product_id=? AND image_path=?",
-                productId,
-                imagePath
-        );
+
+        for (String path : toDeleteImagesPath)
+        {
+            jdbcTemplate.update(
+                    "DELETE FROM product_image WHERE product_id=? AND image_path=?",
+                    productId,
+                    path);
+        }
     }
 
     public void deleteImages(Long productId) {

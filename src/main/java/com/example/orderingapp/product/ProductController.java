@@ -16,7 +16,7 @@ public class ProductController
 {
     private final ProductService service;
 
-    @PostMapping("/secure/product")
+    @PostMapping("/secure/boss/product")
     public ResponseEntity<?> create(
             @RequestBody ProductDTO product) {
 
@@ -34,11 +34,6 @@ public class ProductController
         );
     }
 
-    @PostMapping("/secure/product/insert/images")
-    public void insertProductImages (@RequestBody ProductImageInsert productImageInsert) {
-        service.insertProductImages(productImageInsert.getProductName(), productImageInsert.getProductImagePaths());
-    }
-
     @GetMapping("/all/product")
     public ResponseEntity<List<ProductDTO>> getAll() {
 
@@ -47,12 +42,12 @@ public class ProductController
         );
     }
 
-    @PutMapping("/secure/product")
+    @PutMapping("/secure/boss/product")
     public ResponseEntity<String> update(
             @RequestBody ProductUpdateRequest request) {
 
         service.update(
-                request.getOldProduct(),
+                request.getOldProductName(),
                 request.getNewProduct()
         );
 
@@ -61,7 +56,7 @@ public class ProductController
         );
     }
 
-    @DeleteMapping("/secure/product/{productName}")
+    @DeleteMapping("/secure/boss/product/{productName}")
     public ResponseEntity<String> delete(
             @PathVariable String productName) {
 
@@ -70,11 +65,6 @@ public class ProductController
         return ResponseEntity.ok(
                 "Product deleted successfully"
         );
-    }
-
-    @DeleteMapping("/secure/product/delete/images")
-    public void deleteProductImage (@RequestBody ProductImageDelete productImageDelete) {
-        service.deleteProductImage(productImageDelete.getProductName(), productImageDelete.getProductImagePath());
     }
 
     @GetMapping("/secure/product/test")

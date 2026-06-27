@@ -1,22 +1,15 @@
 package com.example.orderingapp.order;
 
-import com.example.orderingapp.dto.order.CreateOrderRequest;
-import com.example.orderingapp.dto.order.OrderResponseDTO;
-import com.example.orderingapp.dto.order.OrderedProducts;
+import com.example.orderingapp.dto.order.*;
 import com.example.orderingapp.dto.product.ProductDTO;
+import com.example.orderingapp.product.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.annotation.Order;
-import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.*;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -24,37 +17,60 @@ public class OrderRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    //CreateOrderRequest
+    public Order createOrder (Order order, ProductRepository productRepository) {
 
-    public CreateOrderRequest createOrder (CreateOrderRequest createOrderRequest) {
+        String sql = "INSERT INTO `order`(uuid, table_number, order_paid) VALUES (?, ?, ?)";
 
-        String sql = "INSERT INTO `order`(uuid, table_number, order_paid) VALUES (?, ?, 0)";
+        jdbcTemplate.update(sql, order.getUuid(), order.getTableNumber(), order.isPaid());
 
-        jdbcTemplate.update(sql, createOrderRequest.getUuid(), createOrderRequest.getTableNumber());
+        Long id = findOrderIDByUUID(order.getUuid());
 
-        Long id = findOrderIDByUUID(createOrderRequest.getUuid());
-        addOrderedProducts(id, createOrderRequest.getOrderedProducts());
-        return createOrderRequest;
+        List<String> toRemoveOrderedProducts = addOrderedProducts(id, order.getProductNameToQty(), productRepository);
+
+        removeOrderedProducts(toRemoveOrderedProducts, order.getProductNameToQty());
+
+        return order;
     }
 
-    private void addOrderedProducts (Long orderId, List<OrderedProducts> orderedProductsList)
+    private List<String> addOrderedProducts (Long orderId, HashMap<String, Integer> productNameToQty, ProductRepository productRepository)
     {
         String sql = "INSERT INTO order_products(order_id, product_id, product_quantity) VALUES(?, ?, ?)";
 
-        jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
-                    @Override
-                    public void setValues(PreparedStatement ps, int i) throws SQLException {
-                        OrderedProducts orderedProduct = orderedProductsList.get(i);
-                        ps.setLong(1, orderId); // Assuming getOrderId() exists
-                        ps.setLong(2, orderedProduct.getProductDTO().getId());
-                        ps.setInt(3, orderedProduct.getProductQuantity());
-                    }
+        List<String> toRemoveOrderedProducts = new ArrayList<>();
 
-                    @Override
-                    public int getBatchSize() {
-                        return orderedProductsList.size();
-                    }
+        for (Map.Entry<String, Integer> entry : productNameToQty.entrySet())
+        {
+            String productName = entry.getKey();
+            int productQty = entry.getValue();
+
+            Long productID = productRepository.findProductIdByName(productName);
+
+            if (productID.equals(null)) {
+                toRemoveOrderedProducts.add(productName);
+                continue;
+            }
+
+            jdbcTemplate.update(sql, orderId, productID, productQty);
+        }
+        return toRemoveOrderedProducts;
+    }
+
+    private void removeOrderedProducts (List<String> toRemoveOrderedProducts, HashMap<String, Integer> productNameToQty)
+    {
+        toRemoveOrderedProducts.forEach(e -> {
+            productNameToQty.remove(e);
         });
+    }
+
+    public boolean isOrderPaid (String orderUuid)
+    {
+        String sql = "SELECT order_paid FROM `order` WHERE uuid=?";
+
+        RowMapper<Boolean> mapper = (rs, rn) -> rs.getBoolean(1);
+
+        List<Boolean> l = jdbcTemplate.query(sql, mapper, orderUuid);
+
+        return l.isEmpty() ? false : l.getFirst();
     }
 
     public void updateOrderTableNumber (
@@ -72,8 +88,8 @@ public class OrderRepository {
 
     public void updateOrderProduct (Long orderId, List<OrderedProducts> orderedProducts)
     {
-        deleteOrderProducts(orderId);
-        addOrderedProducts(orderId, orderedProducts);
+//        deleteOrderProducts(orderId);
+//        addOrderedProducts(orderId, orderedProducts);
     }
 
 
@@ -83,9 +99,109 @@ public class OrderRepository {
 
         RowMapper<Long> mapper = (rs, rn) -> rs.getLong(1);
 
-        return jdbcTemplate.queryForObject(sql, mapper, uuid);
+        var l = jdbcTemplate.query(sql, mapper, uuid);
+
+        return l.isEmpty() ? null : l.getFirst();
     }
 
+    public Order findOrderByUUID (String uuid, ProductRepository productRepository) {
+
+        String sql = "SELECT id FROM `order` WHERE uuid=?";
+
+        RowMapper<Long> mapper = (rs, rn) -> rs.getLong(1);
+
+        var l = jdbcTemplate.query(sql, mapper, uuid);
+
+        Long id =  l.isEmpty() ? null : l.getFirst();
+
+        if (id != null)
+            return getOrder(id, productRepository);
+
+        return null;
+    }
+
+    public Order getOrder (long id, ProductRepository productRepository) {
+
+        String sql = "SELECT * FROM `order` WHERE id=?";
+
+        RowMapper<Order> mapper = (rs, rn) -> {
+
+            Order order = new Order();
+
+            order.setId(rs.getLong(1));
+            order.setUuid(rs.getString(2));
+            order.setTableNumber(rs.getInt(3));
+            order.setPaid(rs.getBoolean(4));
+            order.setCreatedAt(rs.getObject(5, LocalDateTime.class));
+
+            return order;
+        };
+
+        Order order = jdbcTemplate.queryForObject(sql, mapper, id);
+
+        populateOrderProductNameToQty_ToPriceMap(order, productRepository);
+
+        return order;
+    }
+
+    public void populateOrderProductNameToQty_ToPriceMap (Order order, ProductRepository productRepository, long... id)
+    {
+        long orderID = (id.length == 0) ? order.getId() : id[0];
+
+        List<Long> orderProductIDs = getOrderProductIDs(orderID);
+
+        List<ProductDTO> productDTOs = getOrderProductDTOs(productRepository, orderProductIDs);
+
+        setOrderProductNameToPriceMap(order, productDTOs);
+
+        setOrderProductNameToQtyMap(order, productDTOs);
+    }
+
+    public List<ProductDTO> getOrderProductDTOs (ProductRepository productRepository, List<Long> orderProductIDs) {
+
+        List<ProductDTO> productDTOs = new ArrayList<>();
+
+        orderProductIDs.forEach( e ->
+        {
+            ProductDTO productDTO = productRepository.findById(e);
+
+            if (productDTO != null)
+                productDTOs.add(productDTO);
+        });
+
+        return productDTOs;
+    }
+
+    public void setOrderProductNameToQtyMap (Order order, List<ProductDTO> productDTOs)
+    {
+        String sql = "SELECT order_products.product_quantity FROM order_products WHERE order_products.order_id=? AND order_products.product_id=?";
+
+        RowMapper<Integer> mapper = (rs, rn) -> rs.getInt(1);
+
+        productDTOs.forEach(e ->
+        {
+            var l = jdbcTemplate.query(sql, mapper, order.getId(), e.getId());
+
+            if (!l.isEmpty())
+                order.getProductNameToQty().put(e.getName(), l.getFirst());
+        });
+    }
+
+    public void setOrderProductNameToPriceMap (Order order, List<ProductDTO> productDTOs)
+    {
+        productDTOs.forEach(e -> {
+            order.getProductNameToPrice().put(e.getName(), e.getPrice());
+        });
+    }
+
+    public List<Long> getOrderProductIDs (long orderID)
+    {
+        String sql = "SELECT product_id FROM order_products WHERE order_id=?";
+
+        RowMapper<Long> mapper = (rs,rn) -> rs.getLong(1);
+
+        return jdbcTemplate.query(sql, mapper, orderID);
+    }
 
     public boolean isOrderPaid(Long orderId) {
 

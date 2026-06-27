@@ -1,8 +1,6 @@
 package com.example.orderingapp.order;
 
-import com.example.orderingapp.dto.order.CreateOrderRequest;
-import com.example.orderingapp.dto.order.OrderFail;
-import com.example.orderingapp.dto.order.OrderResponseDTO;
+import com.example.orderingapp.dto.order.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -22,25 +20,35 @@ public class OrderController {
     @PostMapping
     @PreAuthorize("@preAuthorizedService.isValidApiKey(#request.apiKey)")
     public ResponseEntity<?> createOrder(
-            @RequestBody CreateOrderRequest request) {
-
+            @RequestBody Order request)
+    {
         return orderService.createOrder(request);
     }
 
-    @PutMapping
-    @PreAuthorize("@preAuthorizedService.isValidApiKey(#request.apiKey)")
-    public ResponseEntity<?> updateOrder(
-            @RequestBody CreateOrderRequest request) {
-
-        return orderService.updateOrder(request);
+    @GetMapping("/{orderUuid}")
+    public ResponseEntity<?> isOrderPaid (@PathVariable String orderUuid) {
+        return orderService.isOrderPaid(orderUuid);
     }
 
+    @GetMapping("/order/{orderUuid}")
+    public ResponseEntity<?> order (@PathVariable String orderUuid) {
+        return orderService.getOrder(orderUuid);
+    }
+
+//    @PutMapping
+//    @PreAuthorize("@preAuthorizedService.isValidApiKey(#request.apiKey)")
+//    public ResponseEntity<?> updateOrder(
+//            @RequestBody CreateOrderRequest request) {
+//
+//        return orderService.updateOrder(request);
+//    }
+
     @DeleteMapping
-    @PreAuthorize("@preAuthorizedService.isValidApiKey(#request.apiKey)")
+    @PreAuthorize("@preAuthorizedService.isValidApiKey(#order.apiKey)")
     public ResponseEntity<?> deleteOrder(
-            @RequestPart CreateOrderRequest request, @RequestPart OrderFail orderFail)
+            @RequestBody Order order)
     {
-        return orderService.deleteOrder(orderFail);
+        return orderService.deleteOrder(order.getUuid());
     }
 
 //    @GetMapping("/by-date")
